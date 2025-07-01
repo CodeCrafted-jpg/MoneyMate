@@ -117,7 +117,6 @@ const IncomeForm = ({setShowForm}) => {
       {/* Submit Button */}
       <button
         type="submit"
-        onClick={()=>setShowForm(false)}
         className="w-full rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 transition"
       >
         Add Income

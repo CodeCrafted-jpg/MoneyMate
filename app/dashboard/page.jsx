@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Sidebar from "@/components/sidebar";
@@ -10,109 +10,157 @@ import SummaryCards from "@/components/SummeryCard";
 import Link from "next/link";
 import ReportSection from "@/components/data/dataCharts";
 import MonthlyComparisonChart from "@/components/data/MonthlyData";
-
+import DateFilter from "@/components/data/dataFilter";
 
 export default function DashboardPage() {
   const router = useRouter();
+
   const [userChecked, setUserChecked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [thisMonth, setThisMonth] = useState({ income: [], expenses: [] });
   const [lastMonth, setLastMonth] = useState({ income: [], expenses: [] });
   const [investments, setInvestments] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
+  const [dateRange, setDateRange] = useState({ startDate: null, endDate: null });
+  const [selectedRange, setSelectedRange] = useState("thisMonth"); // ✅ NEW STATE
 
-  // 🧠 Helper to get date ranges
-  const getDateRange = (monthOffset = 0) => {
+  const getDateRange = (offset = 0) => {
     const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
-    const end = new Date(now.getFullYear(), now.getMonth() + monthOffset + 1, 0);
+    const start = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
     return {
       start: start.toISOString(),
       end: end.toISOString(),
     };
   };
 
-  const fetchDashboardData = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
+  const fetchDashboardData = useCallback(
+    async (user, startDate, endDate) => {
+      setLoading(true);
 
-    const { start: thisStart, end: thisEnd } = getDateRange(0);
-    const { start: lastStart, end: lastEnd } = getDateRange(-1);
+      const { start: lastStart, end: lastEnd } = getDateRange(-1);
 
-    const [thisInc, thisExp, lastInc, lastExp, invest, subs] = await Promise.all([
-      supabase
-        .from("income")
-        .select("*")
-        .eq("user_id", user.id)
-        .gte("received_at", thisStart)
-        .lte("received_at", thisEnd),
+      const [thisInc, thisExp, lastInc, lastExp, invest, subs] = await Promise.all([
+        startDate && endDate
+          ? supabase
+              .from("income")
+              .select("*")
+              .eq("user_id", user.id)
+              .gte("received_at", startDate)
+              .lte("received_at", endDate)
+          : Promise.resolve({ data: [] }),
 
-      supabase
-        .from("expanse")
-        .select("*")
-        .eq("user_id", user.id)
-        .gte("created_at", thisStart)
-        .lte("created_at", thisEnd),
+        startDate && endDate
+          ? supabase
+              .from("expanse")
+              .select("*")
+              .eq("user_id", user.id)
+              .gte("created_at", startDate)
+              .lte("created_at", endDate)
+          : Promise.resolve({ data: [] }),
 
-      supabase
-        .from("income")
-        .select("*")
-        .eq("user_id", user.id)
-        .gte("received_at", lastStart)
-        .lte("received_at", lastEnd),
+        supabase
+          .from("income")
+          .select("*")
+          .eq("user_id", user.id)
+          .gte("received_at", lastStart)
+          .lte("received_at", lastEnd),
 
-      supabase
-        .from("expanse")
-        .select("*")
-        .eq("user_id", user.id)
-        .gte("created_at", lastStart)
-        .lte("created_at", lastEnd),
+        supabase
+          .from("expanse")
+          .select("*")
+          .eq("user_id", user.id)
+          .gte("created_at", lastStart)
+          .lte("created_at", lastEnd),
 
-      supabase.from("investment").select("*").eq("user_id", user.id),
-      supabase.from("subscription").select("*").eq("user_id", user.id),
-    ]);
+        startDate && endDate
+  ? supabase
+      .from("investment")
+      .select("*")
+      .eq("user_id", user.id)
+      .gte("created_at", startDate)
+      .lte("created_at", endDate)
+  : Promise.resolve({ data: [] }),
 
-    setThisMonth({ income: thisInc.data || [], expenses: thisExp.data || [] });
-    setLastMonth({ income: lastInc.data || [], expenses: lastExp.data || [] });
-    setInvestments(invest.data || []);
-    setSubscriptions(subs.data || []);
-    setLoading(false);
-  };
+startDate && endDate
+  ? supabase
+      .from("subscription")
+      .select("*")
+      .eq("user_id", user.id)
+      .gte("created_at", startDate)
+      .lte("created_at", endDate)
+  : Promise.resolve({ data: [] }),
+
+      ]);
+
+      setThisMonth({ income: thisInc.data || [], expenses: thisExp.data || [] });
+      setLastMonth({ income: lastInc.data || [], expenses: lastExp.data || [] });
+      setInvestments(invest.data || []);
+      setSubscriptions(subs.data || []);
+      setLoading(false);
+    },
+    []
+  );
 
   useEffect(() => {
     const checkSession = async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (!session) {
+
+      if (!session?.user) {
         router.push("/Signin");
-      } else {
-        setUserChecked(true);
-        fetchDashboardData();
+        return;
       }
+
+      setUserChecked(true);
+
+      const { start, end } = getDateRange(0);
+      setDateRange({ startDate: start, endDate: end });
+      fetchDashboardData(session.user, start, end);
     };
+
     checkSession();
-  }, [router]);
+  }, [router, fetchDashboardData]);
+
+  const handleFilterChange = async ({ startDate, endDate, selected }) => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.user) return;
+
+    setSelectedRange(selected); // ✅ update current selection
+    setDateRange({ startDate: startDate.toISOString(), endDate: endDate.toISOString() });
+    fetchDashboardData(session.user, startDate.toISOString(), endDate.toISOString());
+  };
 
   if (!userChecked || loading) {
-    return <p className="text-gray-500 p-4"></p>;
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-white dark:bg-gray-900">
+        <p className="text-gray-500 dark:text-gray-300 text-lg">Loading your dashboard...</p>
+      </div>
+    );
   }
 
-  const activeSubscriptions = subscriptions.filter((sub) => sub.status === "active");
+ const activeSubscriptions = subscriptions.filter(
+  (sub) =>
+    sub.status === "active" &&
+    new Date(sub.end_date) >= new Date()
+);
 
   return (
     <div className="relative">
       <div className="flex h-screen">
         <Sidebar />
 
-        <div className="flex-1 p-4 relative bg-white dark:bg-gray-900 overflow-y-auto">
-          <div className="flex justify-end">
+        <div className="flex-1 p-4 bg-white dark:bg-gray-900 overflow-y-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold text-orange-500">Dashboard Overview</h1>
             <ThemeToggle />
           </div>
 
-          <h1 className="text-2xl font-bold mb-4 text-orange-500">Overview: 30 Days</h1>
+          {/* ✅ Pass selected prop */}
+          <DateFilter onFilterChange={handleFilterChange} selected={selectedRange} />
 
           <SummaryCards
             data={{
@@ -123,17 +171,21 @@ export default function DashboardPage() {
             }}
           />
 
-          {/* ✅ Active Subscriptions */}
           <div className="mt-8">
             <h2 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">
-              <Link href="/subscription"><u>Active Subscriptions</u></Link>
+              <Link href="/subscription">
+                <u>Active Subscriptions</u>
+              </Link>
             </h2>
             {activeSubscriptions.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-400">No active subscriptions.</p>
             ) : (
               <ul className="space-y-2">
                 {activeSubscriptions.map((sub) => (
-                  <li key={sub.id} className="p-3 border rounded-md shadow-sm border-gray-200 dark:border-gray-700">
+                  <li
+                    key={sub.id}
+                    className="p-3 border rounded-md shadow-sm border-gray-200 dark:border-gray-700"
+                  >
                     <div className="flex justify-between items-center">
                       <div>
                         <div className="font-semibold text-black dark:text-white">{sub.title}</div>
@@ -150,12 +202,10 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* 📊 Report Section */}
           <div className="mt-10">
             <ReportSection expenses={thisMonth.expenses} income={thisMonth.income} />
           </div>
 
-          {/* 📉 Monthly Comparison Chart */}
           <div className="mt-10">
             <MonthlyComparisonChart
               current={{

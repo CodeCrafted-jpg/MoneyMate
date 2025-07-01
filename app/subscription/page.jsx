@@ -39,21 +39,24 @@ export default function SubscriptionPage() {
     fetchExpenses();
   }, [showForm]);
   const handleDelete = async (id) => {
-    const { error } = await supabase
-      .from('subscription')
-      .delete()
-      .eq('id', id);
+  const { error } = await supabase
+    .from('subscription')
+    .delete()
+    .eq('id', id);
 
-    if (error) {
-      toast.error('Delete failed');
-      console.error(error);
-    } else {
-      toast.success('Deleted!', {
-        duration: 3000
-      });
-      setSubs(subs.filter((e) => e.id !== id));
-    }
-  };
+  if (error) {
+    toast.error('Delete failed');
+    console.error(error);
+  } else {
+    toast.success('Deleted!', {
+      duration: 3000
+    });
+
+    setSubs((prev) => prev.filter((e) => e.id !== id)); // ✅ update subs
+    setFilteredSubscription((prev) => prev.filter((e) => e.id !== id)); // ✅ update filtered list
+  }
+};
+
   const handleEdit = (sub) => {
     setEditingSubscription(sub);
   };
