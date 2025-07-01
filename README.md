@@ -1,6 +1,8 @@
-# 💰 MoneyMate
+ 💰 MoneyMate
 
 MoneyMate is a modern personal finance tracking web app built with **Next.js 15**, **Supabase**, **Tailwind CSS**, and **Resend**. It helps users manage their income, expenses, investments, and subscriptions in one intuitive dashboard.
+
+**🔗 Live App:** [money-mate-gamma-six.vercel.app](https://money-mate-gamma-six.vercel.app)
 
 ---
 
@@ -30,8 +32,8 @@ MoneyMate is a modern personal finance tracking web app built with **Next.js 15*
 ## 📦 Installation
 
 ```bash
-# Clone the repo
-git clone https://github.com/your-username/moneymate.git
+# Clone the project (if hosted on GitHub or other repo)
+git clone <your-project-link>
 cd moneymate
 
 # Install dependencies
@@ -100,17 +102,3 @@ This project is open-source and available under the MIT License.
 👨‍💻 Author
 Built with ❤️ by Sayan Mallick
 
-markdown
-Copy
-Edit
-
----
-
-### 📝 What to Do Next:
-
-1. **Save it as** `README.md` in your project root.
-2. Replace `https://github.com/your-username/moneymate.git` with your actual GitHub URL.
-3. Add your Supabase project URL and keys (in `.env.example` if you want to include a template).
-4. Optionally add screenshots and a link to the live app.
-
-Want me to generate a `.env.example` file too?
